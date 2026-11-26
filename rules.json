@@ -1,0 +1,411 @@
+{
+  "version": "1.0",
+  "description": "Modul Kelengkapan Berkas Rekam Medis Rawat Inap Berdasarkan Diagnosis",
+  "last_updated": "2026-11-24",
+  "categories": [
+    {
+      "id": "jantung",
+      "name": "Jantung",
+      "rules": [
+        {
+          "id": "JANTUNG-001",
+          "name": "Ekokardiografi wajib untuk HHF/HF/CHF/HHD",
+          "description": "HHF (I11.0), HF (I50.9), CHF (I50.0), HHD (I11.9) wajib ada prosedur Ekokardiografi (88.72)",
+          "trigger_diagnoses": ["I11.0", "I50.9", "I50.0", "I11.9"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["88.72"]
+          },
+          "physical_document_check": "Bacaan ekokardiografi maksimal dilakukan 6 bulan terakhir",
+          "revision_message": "Diagnosis {matched_diag} memerlukan prosedur Ekokardiografi (88.72) di PROCLIST"
+        },
+        {
+          "id": "JANTUNG-002",
+          "name": "Kombinasi HHF + CKD harus menjadi I13.-",
+          "description": "Jika HHF (I11.-) dan CKD (N18.-) muncul bersamaan, koding harus digabung menjadi I13.-",
+          "type": "combination_check",
+          "trigger_group_a": ["I11.-"],
+          "trigger_group_b": ["N18.-"],
+          "exception_if_present": ["I13.-"],
+          "status_override": "PERLU REVISI",
+          "revision_message": "HHF (I11.-) diikuti dengan CKD (N18.-), maka koding harus digabung menjadi I13.-"
+        },
+        {
+          "id": "JANTUNG-003",
+          "name": "EKG wajib untuk STEMI",
+          "description": "STEMI (I21.0, I21.1, I21.2, I21.3, I21.9) wajib ada prosedur EKG (89.52)",
+          "trigger_diagnoses": ["I21.0", "I21.1", "I21.2", "I21.3", "I21.9"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["89.52"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis STEMI ({matched_diag}) memerlukan prosedur EKG (89.52) di PROCLIST"
+        },
+        {
+          "id": "JANTUNG-003a",
+          "name": "Cek streptokinase pada STEMI",
+          "description": "Jika STEMI disertai prosedur pemberian streptokinase (99.10), wajib cek berkas fisik",
+          "trigger_diagnoses": ["I21.0", "I21.1", "I21.2", "I21.3", "I21.9"],
+          "trigger_mode": "any",
+          "conditional_procedure": "99.10",
+          "type": "conditional_physical_check",
+          "physical_document_check": "Wajib melampirkan bungkus obat streptokinase (nomor seri obat) & bukti evaluasi pemberian obat"
+        },
+        {
+          "id": "JANTUNG-004",
+          "name": "EKG wajib untuk N-STEMI & UAP",
+          "description": "N-STEMI (I21.4) dan UAP (I20.0) wajib ada prosedur EKG (89.52)",
+          "trigger_diagnoses": ["I21.4", "I20.0"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["89.52"]
+          },
+          "physical_document_check": "Bukti pemeriksaan troponin & lembar EKG",
+          "revision_message": "Diagnosis {matched_diag} memerlukan prosedur EKG (89.52) di PROCLIST"
+        },
+        {
+          "id": "JANTUNG-005",
+          "name": "EKG & Ekokardiografi wajib untuk Angina Pectoris",
+          "description": "Angina Pectoris (I20.9) wajib ada EKG (89.52) DAN Ekokardiografi (88.72)",
+          "trigger_diagnoses": ["I20.9"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["89.52", "88.72"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis Angina Pectoris (I20.9) memerlukan prosedur EKG (89.52) DAN Ekokardiografi (88.72) di PROCLIST"
+        },
+        {
+          "id": "JANTUNG-006",
+          "name": "EKG wajib untuk SVT/AF/Atrial Flutter",
+          "description": "SVT (I47.1), AF & Atrial Flutter (I48, I48.-) wajib ada prosedur EKG (89.52)",
+          "trigger_diagnoses": ["I47.1", "I48", "I48.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["89.52"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis {matched_diag} memerlukan prosedur EKG (89.52) di PROCLIST"
+        },
+        {
+          "id": "JANTUNG-007",
+          "name": "USG vascular wajib untuk DVT",
+          "description": "DVT (I80.2) wajib ada prosedur USG vascular (88.77)",
+          "trigger_diagnoses": ["I80.2"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["88.77"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis DVT (I80.2) memerlukan prosedur USG vascular (88.77) di PROCLIST"
+        }
+      ]
+    },
+    {
+      "id": "paru",
+      "name": "Paru",
+      "rules": [
+        {
+          "id": "PARU-001",
+          "name": "Thorax foto wajib untuk TB Paru",
+          "description": "TB Paru (A15.-, A16.-) wajib ada prosedur Thorax foto (87.49)",
+          "trigger_diagnoses": ["A15.-", "A16.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["87.49"]
+          },
+          "physical_document_check": "Bacaan thorax foto (TB Paru Klinis), hasil TCM (TB bakteriologis), dan bukti pemberian OAT",
+          "revision_message": "Diagnosis TB Paru ({matched_diag}) memerlukan prosedur Thorax foto (87.49) di PROCLIST"
+        },
+        {
+          "id": "PARU-002",
+          "name": "Thorax foto & Kultur sputum untuk Pneumonia",
+          "description": "Pneumonia (J15.-) wajib ada Thorax foto (87.49) DAN Kultur sputum (90.42). Pengecualian: jika ada TB Paru (A15.-/A16.-), kultur sputum tidak diwajibkan",
+          "trigger_diagnoses": ["J15.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["87.49", "90.42"]
+          },
+          "exception_diagnoses_remove_procedure": {
+            "if_diagnoses_present": ["A15.-", "A16.-"],
+            "remove_procedures": ["90.42"]
+          },
+          "physical_document_check": "Penilaian PSI Score / CURB score sebagai indikasi rawat inap & bukti pemberian antibiotik minimal 72 jam sejak pemberian pertama",
+          "revision_message": "Diagnosis Pneumonia ({matched_diag}) memerlukan prosedur Thorax foto (87.49) dan Kultur sputum (90.42) di PROCLIST"
+        },
+        {
+          "id": "PARU-003",
+          "name": "Spirometri wajib untuk PPOK",
+          "description": "PPOK (J44.9) wajib ada prosedur Spirometri/peakflow (89.38)",
+          "trigger_diagnoses": ["J44.9"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["89.38"]
+          },
+          "physical_document_check": "Hasil pemeriksaan spirometri/peakflow sebelum dan sesudah",
+          "revision_message": "Diagnosis PPOK (J44.9) memerlukan prosedur Spirometri/peakflow (89.38) di PROCLIST"
+        },
+        {
+          "id": "PARU-004",
+          "name": "CT Scan thorax atau TTNA untuk Tumor Paru/Mediastinum",
+          "description": "Tumor Paru (D14.3) & Mediastinum (D15.2) wajib ada CT Scan thorax (87.41) ATAU TTNA (33.26)",
+          "trigger_diagnoses": ["D14.3", "D15.2"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "any",
+            "codes": ["87.41", "33.26"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis Tumor Paru/Mediastinum ({matched_diag}) memerlukan prosedur CT Scan thorax (87.41) ATAU TTNA (33.26) di PROCLIST"
+        },
+        {
+          "id": "PARU-005",
+          "name": "Pungsi pleura atau WSD untuk Efusi Pleura",
+          "description": "Efusi Pleura (J90) wajib ada Pungsi pleura (34.91) ATAU Pemasangan WSD (34.04)",
+          "trigger_diagnoses": ["J90"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "any",
+            "codes": ["34.91", "34.04"]
+          },
+          "physical_document_check": "Jika J90 sebagai diagnosis sekunder, wajib memenuhi kriteria bukti cairan/tindakan pungsi pleura atau imaging dengan tatalaksana tambahan di luar diagnosis primer",
+          "revision_message": "Diagnosis Efusi Pleura (J90) memerlukan prosedur Pungsi pleura (34.91) ATAU Pemasangan WSD (34.04) di PROCLIST"
+        },
+        {
+          "id": "PARU-006",
+          "name": "Tatalaksana oksigen/ventilasi untuk Gagal Napas",
+          "description": "Gagal Napas (J96.0, J96.1) wajib ada salah satu prosedur oksigen/ventilasi",
+          "trigger_diagnoses": ["J96.0", "J96.1"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "any",
+            "codes": ["93.96", "93.960", "93.90", "96.71", "96.72"]
+          },
+          "physical_document_check": "Gagal napas post operasi menggunakan kode J95.9",
+          "revision_message": "Diagnosis Gagal Napas ({matched_diag}) memerlukan prosedur tatalaksana oksigen/ventilasi (93.96/93.960/93.90/96.71/96.72) di PROCLIST"
+        }
+      ]
+    },
+    {
+      "id": "umum",
+      "name": "Aturan Umum (Seluruh Pasien)",
+      "rules": [
+        {
+          "id": "UMUM-001",
+          "name": "Intubasi durante RJPO tidak dikoding",
+          "description": "Jika intubasi (96.04) muncul bersamaan dengan RJPO (99.60), intubasi tidak dikoding. Berlaku untuk seluruh pasien.",
+          "type": "procedure_combination_check",
+          "trigger_procedures_all": ["96.04", "99.60"],
+          "status_override": "PERLU REVISI",
+          "revision_message": "Pada pasien dengan intubasi (96.04) durante RJPO (99.60), maka intubasi (96.04) tidak dikoding"
+        },
+        {
+          "id": "UMUM-002",
+          "name": "Ventilator < 6 jam tidak dikoding",
+          "description": "Jika ventilator (96.71/96.72) dikoding namun VENT_HOUR > 0 dan < 6 jam, ventilator tidak dikoding. Berlaku untuk seluruh pasien (fase pascaresusitasi).",
+          "type": "ventilator_duration_check",
+          "trigger_procedures": ["96.71", "96.72"],
+          "vent_hour_min": 0,
+          "vent_hour_max_exclusive": 6,
+          "status_override": "PERLU REVISI",
+          "revision_message": "Penggunaan ventilator < 6 jam, maka ventilator (96.7-) tidak dikoding (fase pascaresusitasi)"
+        }
+      ]
+    },
+    {
+      "id": "penyakit_dalam",
+      "name": "Penyakit Dalam",
+      "rules": [
+        {
+          "id": "PD-001",
+          "name": "GEA + Dehidrasi cukup dikoding GEA saja",
+          "description": "GEA (A09.9) + Dehidrasi (E86) cukup dikoding GEA saja",
+          "type": "combination_check",
+          "trigger_group_a": ["A09.9"],
+          "trigger_group_b": ["E86"],
+          "status_override": "PERLU REVISI",
+          "revision_message": "GEA (A09.9) + Dehidrasi/Volume depletion (E86) cukup dikoding GEA (A09.9) saja"
+        },
+        {
+          "id": "PD-002",
+          "name": "GEA tunggal tanpa penyulit",
+          "description": "GEA (A09.9) tunggal tanpa diagnosis penyulit berpotensi pending",
+          "type": "single_diagnosis_check",
+          "trigger_diagnoses": ["A09.9"],
+          "status_override": "PERLU REVISI",
+          "revision_message": "GEA (A09.9) tunggal tanpa diagnosis penyulit berpotensi pending karena dapat tuntas di FKTP; harus ada diagnosis penyulit (misal imbalans elektrolit dengan bukti lab & tatalaksana khusus)"
+        },
+        {
+          "id": "PD-003",
+          "name": "Syarat berkas fisik ISK",
+          "description": "ISK (N39.0) memerlukan verifikasi berkas fisik",
+          "trigger_diagnoses": ["N39.0"],
+          "trigger_mode": "any",
+          "required_procedures": null,
+          "physical_document_check": "Keluhan klinis pada anamnesis (nyeri suprapubic/anyang-anyangan/dysuria) + hasil UL leukosit > 5/lpb atau bakteri (+) atau kultur urin",
+          "revision_message": null
+        },
+        {
+          "id": "PD-004",
+          "name": "Syarat berkas fisik AKI",
+          "description": "AKI (N17.9) memerlukan verifikasi berkas fisik",
+          "trigger_diagnoses": ["N17.9"],
+          "trigger_mode": "any",
+          "required_procedures": null,
+          "physical_document_check": "Penegakan kriteria KDIGO tahun 2012 & tatalaksana khusus AKI",
+          "revision_message": null
+        },
+        {
+          "id": "PD-005",
+          "name": "CKD harus spesifik staging",
+          "description": "CKD tidak boleh ditulis N18 atau N18.9, harus spesifik N18.1-N18.5",
+          "type": "specific_code_check",
+          "trigger_diagnoses": ["N18", "N18.9"],
+          "trigger_mode": "any",
+          "status_override": "PERLU REVISI",
+          "revision_message": "Penulisan staging CKD harus spesifik (CKD stage 1-5: N18.1 s.d. N18.5)"
+        },
+        {
+          "id": "PD-005a",
+          "name": "CKD stage 5 dengan HD",
+          "description": "CKD stage 5 (N18.5) disertai HD, pastikan prosedur 39.95 atau 38.95 terinput",
+          "trigger_diagnoses": ["N18.5"],
+          "trigger_mode": "any",
+          "required_procedures": null,
+          "physical_document_check": "Pastikan prosedur billing HD (39.95) atau CVC-HD (38.95) terinput sesuai tindakan hemodialisis",
+          "revision_message": null
+        },
+        {
+          "id": "PD-006",
+          "name": "Syarat berkas fisik Anemia",
+          "description": "Anemia (D64.9, D63.8, D63.0) memerlukan verifikasi berkas fisik",
+          "trigger_diagnoses": ["D64.9", "D63.8", "D63.0"],
+          "trigger_mode": "any",
+          "required_procedures": null,
+          "physical_document_check": "Melampirkan hasil pemeriksaan Hb < 8.0 dan bukti transfusi (atau standar WHO/bukti lab pada anemia persalinan)",
+          "revision_message": null
+        },
+        {
+          "id": "PD-007",
+          "name": "Kultur darah wajib untuk Sepsis",
+          "description": "Sepsis (A41.-) wajib ada prosedur Kultur darah (90.52)",
+          "trigger_diagnoses": ["A41.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["90.52"]
+          },
+          "physical_document_check": "Pemberian antibiotik selama 7 hari sesuai hasil kultur",
+          "revision_message": "Diagnosis Sepsis ({matched_diag}) memerlukan prosedur Kultur darah (90.52) di PROCLIST"
+        },
+        {
+          "id": "PD-008",
+          "name": "Endoskopi wajib untuk Gastritis & Varises Esofagus",
+          "description": "Gastritis (K29.0) & Varises Esofagus (I85.-) wajib ada prosedur Endoskopi (45.13)",
+          "trigger_diagnoses": ["K29.0", "I85.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["45.13"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis {matched_diag} memerlukan prosedur Endoskopi (45.13) di PROCLIST"
+        }
+      ]
+    },
+    {
+      "id": "saraf_rehab",
+      "name": "Saraf dan Rehab Medik",
+      "rules": [
+        {
+          "id": "SARAF-001",
+          "name": "CT Scan Kepala wajib untuk Stroke Infark",
+          "description": "Stroke Infark (I63.-) wajib ada prosedur CT Scan Kepala (87.03)",
+          "trigger_diagnoses": ["I63.-"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["87.03"]
+          },
+          "physical_document_check": "Jika CT scan kepala tidak tampak infark maupun perdarahan gunakan I64; jika tidak ada bacaan CT scan kepala gunakan Z03.3",
+          "revision_message": "Diagnosis Stroke Infark ({matched_diag}) memerlukan prosedur CT Scan Kepala (87.03) di PROCLIST"
+        },
+        {
+          "id": "SARAF-002",
+          "name": "CT Scan Kepala wajib untuk Stroke ICH",
+          "description": "Stroke ICH (I61.9) dan ICH-IVH (I61.5) wajib ada prosedur CT Scan Kepala (87.03)",
+          "trigger_diagnoses": ["I61.9", "I61.5"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["87.03"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis Stroke ICH ({matched_diag}) memerlukan prosedur CT Scan Kepala (87.03) di PROCLIST"
+        },
+        {
+          "id": "SARAF-003",
+          "name": "PPROM wajib untuk Hemiparese/Hemiplegia",
+          "description": "Hemiparese/Hemiplegia (G81.9) wajib ada prosedur Sp. KFR 93.12 atau 93.17 (PPROM)",
+          "trigger_diagnoses": ["G81.9"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "any",
+            "codes": ["93.12", "93.17"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis Hemiparese/Hemiplegia (G81.9) memerlukan prosedur Sp. KFR PPROM (93.12 atau 93.17) di PROCLIST"
+        },
+        {
+          "id": "SARAF-004",
+          "name": "Terapi wicara/menelan wajib untuk Afasia/Disfagia",
+          "description": "Afasia (R47.0) atau Disfagia (R13) wajib ada prosedur Sp. KFR 93.75",
+          "trigger_diagnoses": ["R47.0", "R13"],
+          "trigger_mode": "any",
+          "required_procedures": {
+            "mode": "all",
+            "codes": ["93.75"]
+          },
+          "physical_document_check": null,
+          "revision_message": "Diagnosis {matched_diag} memerlukan prosedur Sp. KFR terapi wicara/menelan (93.75) di PROCLIST"
+        }
+      ]
+    },
+    {
+      "id": "obgyn",
+      "name": "Obgyn",
+      "rules": [
+        {
+          "id": "OBGYN-001",
+          "name": "Penyulit harus menjadi Diagnosis Utama pada persalinan",
+          "description": "Pada persalinan spontan (73.59) atau SC/LSCS (74.1/74.44/74.49), jika ada penyulit maka penyulit harus menjadi Diagnosis Utama",
+          "type": "delivery_complication_check",
+          "trigger_procedures": ["73.59", "74.1", "74.44", "74.49"],
+          "delivery_method_codes": ["O80.-"],
+          "outcome_codes": ["Z37.-"],
+          "revision_message": "Pada persalinan dengan penyulit/komplikasi, penyulit harus menjadi Diagnosis Utama (urutan pertama DIAGLIST), sedangkan metode persalinan (O80.-) dan outcome (Z37.-) sebagai Diagnosis Sekunder"
+        },
+        {
+          "id": "OBGYN-002",
+          "name": "Perineoraphy hanya untuk Ruptur Perineum Grade III/IV",
+          "description": "Perineoraphy (75.69) wajib disertai diagnosis Ruptur Perineum Grade III/IV (O70.2/O70.3)",
+          "type": "procedure_requires_diagnosis",
+          "trigger_procedures": ["75.69"],
+          "required_diagnoses": ["O70.2", "O70.3"],
+          "status_override": "PERLU REVISI",
+          "revision_message": "Perineoraphy (75.69) hanya untuk Ruptur Perineum Grade III/IV (O70.2/O70.3); repair pada rutin episiotomi dikoding 73.6"
+        }
+      ]
+    }
+  ]
+}
