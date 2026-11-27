@@ -47,6 +47,7 @@ STATUS_EMOJI_MAP = {
     "PERLU REVISI": "🔴",
     "Diluar Modul": "⚪",
 }
+TUJUAN_OPTIONS = ["-", "Coder", "Admin Ruangan", "Petugas Entry"]
 
 # ---------------------------------------------------------------------------
 # SESSION STATE INITIALIZATION
@@ -67,6 +68,12 @@ if "pending_notes" not in st.session_state:
 if "pending_file_bytes" not in st.session_state:
     st.session_state["pending_file_bytes"] = None
     st.session_state["pending_file_name"] = None
+
+if "inline_editor_rev" not in st.session_state:
+    st.session_state["inline_editor_rev"] = 0
+
+if "last_verifikator" not in st.session_state:
+    st.session_state["last_verifikator"] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -121,10 +128,12 @@ def apply_status_overrides(df: pd.DataFrame) -> pd.DataFrame:
 
         catatan = override.get("catatan", "")
         verifikator = override.get("verifikator", "")
+        tujuan = override.get("tujuan", "")
+        tujuan_tag = f" (Tujuan: {tujuan})" if tujuan and tujuan != "-" else ""
         override_note = (
-            f"[MANUAL] Status diubah oleh {verifikator}: {catatan}"
+            f"[MANUAL] Status diubah oleh {verifikator}{tujuan_tag}: {catatan}"
             if catatan
-            else f"[MANUAL] Status diubah oleh {verifikator}"
+            else f"[MANUAL] Status diubah oleh {verifikator}{tujuan_tag}"
         )
 
         existing_revisi = str(df.at[idx, "KETERANGAN_REVISI"]) if df.at[idx, "KETERANGAN_REVISI"] else ""
@@ -137,7 +146,7 @@ def apply_status_overrides(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def record_change(sep: str, status_lama: str, status_baru: str,
-                   catatan: str, verifikator: str):
+                   catatan: str, verifikator: str, tujuan: str = "-"):
     """Catat perubahan status ke log riwayat."""
     st.session_state["change_history"].append({
         "sep": sep,
@@ -145,19 +154,22 @@ def record_change(sep: str, status_lama: str, status_baru: str,
         "status_baru": status_baru,
         "catatan": catatan,
         "verifikator": verifikator,
+        "tujuan": tujuan or "-",
         "waktu": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     })
 
 
 def update_status(sep: str, status_lama: str, status_baru: str,
-                   catatan: str, verifikator: str):
+                   catatan: str, verifikator: str, tujuan: str = "-"):
     """Update override status untuk satu SEP dan catat log."""
+    tujuan_clean = tujuan if tujuan and tujuan != "-" else ""
     st.session_state["status_overrides"][sep] = {
         "status": status_baru,
         "catatan": catatan,
         "verifikator": verifikator,
+        "tujuan": tujuan_clean,
     }
-    record_change(sep, status_lama, status_baru, catatan, verifikator)
+    record_change(sep, status_lama, status_baru, catatan, verifikator, tujuan_clean or "-")
 
 
 def build_excel_report(df_validated: pd.DataFrame) -> bytes:
@@ -382,9 +394,12 @@ def build_excel_report(df_validated: pd.DataFrame) -> bytes:
         # === Sheet 6: Riwayat Perubahan ===
         history = st.session_state.get("change_history", [])
         if history:
-            df_history = pd.DataFrame(history)
+            df_history = pd.DataFrame(history).reindex(
+                columns=["sep", "status_lama", "status_baru", "tujuan", "catatan",
+                         "verifikator", "waktu"]
+            ).fillna("")
             df_history.columns = [
-                "SEP", "Status Lama", "Status Baru",
+                "SEP", "Status Lama", "Status Baru", "Tujuan",
                 "Catatan", "Verifikator", "Waktu",
             ]
             hist_cols = list(df_history.columns)
@@ -408,7 +423,7 @@ def build_excel_report(df_validated: pd.DataFrame) -> bytes:
             ).font = SUBTITLE_FONT
 
             HIST_WIDTHS = {"SEP": 26, "Status Lama": 22, "Status Baru": 22,
-                           "Catatan": 40, "Verifikator": 18, "Waktu": 20}
+                           "Tujuan": 18, "Catatan": 40, "Verifikator": 18, "Waktu": 20}
             header_row = 3
             for ci, cn in enumerate(hist_cols, 1):
                 cell = ws_hist.cell(row=header_row, column=ci)
@@ -686,6 +701,80 @@ def flatten_rules_to_table(rules_data: dict) -> pd.DataFrame:
 # DIALOG DETAIL SEP (dengan fitur Edit Status)
 # ---------------------------------------------------------------------------
 
+@st.dialog("✏️ Konfirmasi Perubahan Status", width="medium")
+def show_inline_status_dialog(changed_rows: list[dict], changes_sig: tuple):
+    """Modal popup otomatis saat user mengubah status pada tabel validasi."""
+    st.session_state["dismissed_inline_sig"] = changes_sig
+    st.info(f"**{len(changed_rows)}** SEP diubah statusnya. Lengkapi keterangan di bawah untuk menyimpan.")
+
+    for ch in changed_rows:
+        e_lama = STATUS_EMOJI_MAP.get(ch["status_lama"], "")
+        e_baru = STATUS_EMOJI_MAP.get(ch["status_baru"], "")
+        st.write(f"• **{ch['sep']}**: {e_lama} {ch['status_lama']} → {e_baru} {ch['status_baru']}")
+
+    st.divider()
+    with st.form("inline_dialog_form", clear_on_submit=False):
+        tujuan = st.selectbox(
+            "Tujuan Perubahan",
+            options=TUJUAN_OPTIONS,
+            index=0,
+            help="Pilih tujuan tindak lanjut (Coder, Admin Ruangan, atau Petugas Entry).",
+        )
+        catatan = st.text_area(
+            "Catatan / Alasan Perubahan *",
+            placeholder="Contoh: Berkas fisik sudah lengkap, Koding sudah diperbaiki, dll.",
+        )
+        verifikator = st.text_input(
+            "Nama Verifikator *",
+            value=st.session_state.get("last_verifikator", ""),
+            placeholder="Nama petugas verifikator",
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            save_clicked = st.form_submit_button(
+                f"💾 Simpan {len(changed_rows)} Perubahan",
+                type="primary",
+                use_container_width=True,
+            )
+        with c2:
+            cancel_clicked = st.form_submit_button(
+                "❌ Batalkan Perubahan",
+                type="secondary",
+                use_container_width=True,
+            )
+
+        if save_clicked:
+            if not catatan.strip():
+                st.error("❌ Catatan/alasan perubahan wajib diisi!")
+            elif not verifikator.strip():
+                st.error("❌ Nama verifikator wajib diisi!")
+            else:
+                for ch in changed_rows:
+                    update_status(
+                        ch["sep"],
+                        ch["status_lama"],
+                        ch["status_baru"],
+                        catatan.strip(),
+                        verifikator.strip(),
+                        tujuan,
+                    )
+                st.session_state["last_verifikator"] = verifikator.strip()
+                st.session_state["inline_editor_rev"] += 1
+                st.session_state.pop("dismissed_inline_sig", None)
+                st.session_state["flash_message"] = (
+                    f"✅ Berhasil menyimpan perubahan status **{len(changed_rows)} SEP**"
+                    + (f" (Tujuan: **{tujuan}**)" if tujuan != "-" else "")
+                    + "!"
+                )
+                st.rerun()
+
+        if cancel_clicked:
+            st.session_state["inline_editor_rev"] += 1
+            st.session_state.pop("dismissed_inline_sig", None)
+            st.rerun()
+
+
 @st.dialog("Detail SEP", width="large")
 def show_sep_detail(row: pd.Series, rules_data: dict):
     """Tampilkan modal detail SEP dengan form edit status."""
@@ -700,7 +789,11 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
     st.subheader(f"{emoji} SEP: {sep_no} — {status}")
 
     if is_overridden:
-        st.info(f"ℹ️ Status telah diubah manual oleh **{override.get('verifikator', '-')}** — Catatan: _{override.get('catatan', '-')}_")
+        tujuan_ov = override.get("tujuan") or "-"
+        st.info(
+            f"ℹ️ Status telah diubah manual oleh **{override.get('verifikator', '-')}** "
+            f"— Tujuan: **{tujuan_ov}** — Catatan: _{override.get('catatan', '-')}_"
+        )
 
     if status == "ACC":
         st.success(f"**{sep_no}** — Semua kode sesuai aturan modul ✅")
@@ -798,9 +891,10 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
         for h in reversed(sep_history):
             e_lama = STATUS_EMOJI_MAP.get(h["status_lama"], "")
             e_baru = STATUS_EMOJI_MAP.get(h["status_baru"], "")
+            tujuan_h = h.get("tujuan") or "-"
             st.write(
                 f"  🕐 `{h['waktu']}` — {e_lama} {h['status_lama']} → {e_baru} {h['status_baru']} "
-                f"oleh **{h['verifikator']}** — _{h['catatan']}_"
+                f"oleh **{h['verifikator']}** (Tujuan: **{tujuan_h}**) — _{h['catatan']}_"
             )
 
     # --- Form Edit Status ---
@@ -808,6 +902,8 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
     st.markdown("### ✏️ Ubah Status SEP Ini")
 
     current_idx = STATUS_OPTIONS.index(status) if status in STATUS_OPTIONS else 0
+    cur_tujuan = (override or {}).get("tujuan") or "-"
+    tujuan_idx = TUJUAN_OPTIONS.index(cur_tujuan) if cur_tujuan in TUJUAN_OPTIONS else 0
 
     with st.form(f"edit_status_{sep_no}", clear_on_submit=False):
         new_status = st.selectbox(
@@ -816,6 +912,12 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
             index=current_idx,
             key=f"new_status_{sep_no}",
         )
+        tujuan = st.selectbox(
+            "Tujuan Perubahan",
+            options=TUJUAN_OPTIONS,
+            index=tujuan_idx,
+            key=f"tujuan_{sep_no}",
+        )
         catatan = st.text_area(
             "Catatan / Alasan Perubahan *",
             placeholder="Contoh: Berkas fisik sudah diverifikasi lengkap, Koding sudah diperbaiki oleh coder, dll.",
@@ -823,6 +925,7 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
         )
         verifikator = st.text_input(
             "Nama Verifikator *",
+            value=st.session_state.get("last_verifikator", ""),
             placeholder="Nama petugas verifikator",
             key=f"verifikator_{sep_no}",
         )
@@ -837,7 +940,8 @@ def show_sep_detail(row: pd.Series, rules_data: dict):
             elif new_status == status and not is_overridden:
                 st.warning("⚠️ Status tidak berubah.")
             else:
-                update_status(sep_no, status, new_status, catatan.strip(), verifikator.strip())
+                update_status(sep_no, status, new_status, catatan.strip(), verifikator.strip(), tujuan)
+                st.session_state["last_verifikator"] = verifikator.strip()
                 st.success(f"✅ Status SEP **{sep_no}** berhasil diubah menjadi **{new_status}**")
                 st.rerun()
 
@@ -1196,6 +1300,8 @@ with tab_validasi:
     else:
         page_size = int(page_size_opt)
         total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        if st.session_state.get("table_page_num", 1) > total_pages:
+            st.session_state["table_page_num"] = total_pages
         with pg_col2:
             current_page = st.number_input(
                 f"Halaman (1 - {total_pages}):",
@@ -1233,6 +1339,14 @@ with tab_validasi:
     # Kolom yang TIDAK boleh diedit (semua kecuali STATUS_VALIDASI)
     disabled_cols = [c for c in df_editable.columns if c != "STATUS_VALIDASI"]
 
+    _flash = st.session_state.pop("flash_message", None)
+    if _flash:
+        st.success(_flash)
+
+    # Placeholder untuk bar aksi cepat tepat di atas tabel jika ada perubahan tertunda
+    inline_bar_placeholder = st.container()
+
+    editor_key = f"sep_table_editor_{st.session_state['inline_editor_rev']}"
     edited_df = st.data_editor(
         df_editable,
         use_container_width=True,
@@ -1254,10 +1368,10 @@ with tab_validasi:
             "CEK_BERKAS_FISIK": st.column_config.TextColumn("Cek Berkas Fisik", width=250),
         },
         hide_index=True,
-        key="sep_table_editor",
+        key=editor_key,
     )
 
-    # --- Deteksi perubahan inline (vectorized) ---
+    # --- Deteksi perubahan status -> buka modal popup otomatis (tanpa scroll ke bawah) ---
     changed_rows = []
     if not df_editable.empty:
         diff_mask = df_editable["STATUS_VALIDASI"] != edited_df["STATUS_VALIDASI"]
@@ -1269,45 +1383,23 @@ with tab_validasi:
             })
 
     if changed_rows:
-        st.divider()
-        st.subheader("⚡ Perubahan Status Terdeteksi di Tabel")
-        st.info(f"**{len(changed_rows)}** SEP diubah statusnya. Isi keterangan di bawah lalu klik **Simpan**.")
-
-        for ch in changed_rows:
-            e_lama = STATUS_EMOJI_MAP.get(ch["status_lama"], "")
-            e_baru = STATUS_EMOJI_MAP.get(ch["status_baru"], "")
-            st.write(f"  • **{ch['sep']}**: {e_lama} {ch['status_lama']} → {e_baru} {ch['status_baru']}")
-
-        with st.form("inline_edit_confirm", clear_on_submit=True):
-            inline_catatan = st.text_area(
-                "Catatan / Alasan Perubahan *",
-                placeholder="Contoh: Berkas fisik sudah lengkap, Koding sudah diperbaiki, dll.",
-                key="inline_catatan",
-            )
-            inline_verifikator = st.text_input(
-                "Nama Verifikator *",
-                placeholder="Nama petugas verifikator",
-                key="inline_verifikator",
-            )
-            confirm = st.form_submit_button(
-                f"💾 Simpan {len(changed_rows)} Perubahan", type="primary"
-            )
-
-            if confirm:
-                if not inline_catatan.strip():
-                    st.error("❌ Catatan/alasan perubahan wajib diisi!")
-                elif not inline_verifikator.strip():
-                    st.error("❌ Nama verifikator wajib diisi!")
-                else:
-                    for ch in changed_rows:
-                        update_status(
-                            ch["sep"], ch["status_lama"], ch["status_baru"],
-                            inline_catatan.strip(), inline_verifikator.strip(),
-                        )
-                    st.success(
-                        f"✅ Berhasil menyimpan perubahan status **{len(changed_rows)} SEP**!"
-                    )
+        changes_sig = tuple((c["sep"], c["status_lama"], c["status_baru"]) for c in changed_rows)
+        with inline_bar_placeholder:
+            bar_c1, bar_c2, bar_c3 = st.columns([3, 1.3, 1])
+            with bar_c1:
+                st.warning(f"⚡ **{len(changed_rows)}** perubahan status belum disimpan.")
+            with bar_c2:
+                if st.button("📝 Isi Keterangan & Simpan", type="primary", use_container_width=True, key="reopen_inline_dialog_btn"):
+                    st.session_state.pop("dismissed_inline_sig", None)
                     st.rerun()
+            with bar_c3:
+                if st.button("↩️ Batalkan", use_container_width=True, key="cancel_inline_dialog_btn"):
+                    st.session_state["inline_editor_rev"] += 1
+                    st.session_state.pop("dismissed_inline_sig", None)
+                    st.rerun()
+
+        if st.session_state.get("dismissed_inline_sig") != changes_sig:
+            show_inline_status_dialog(changed_rows, changes_sig)
 
     st.divider()
 
@@ -1701,6 +1793,12 @@ with tab_edit:
                 index=0,
                 key="bulk_new_status",
             )
+            bulk_tujuan = st.selectbox(
+                "Tujuan Perubahan",
+                options=TUJUAN_OPTIONS,
+                index=0,
+                key="bulk_tujuan",
+            )
             bulk_catatan = st.text_area(
                 "Catatan / Alasan Perubahan *",
                 placeholder="Contoh: Berkas fisik sudah diverifikasi semua, Koding sudah diperbaiki batch, dll.",
@@ -1708,6 +1806,7 @@ with tab_edit:
             )
             bulk_verifikator = st.text_input(
                 "Nama Verifikator *",
+                value=st.session_state.get("last_verifikator", ""),
                 placeholder="Nama petugas verifikator",
                 key="bulk_verifikator",
             )
@@ -1735,8 +1834,10 @@ with tab_edit:
                             update_status(
                                 sep, old_status, bulk_new_status,
                                 bulk_catatan.strip(), bulk_verifikator.strip(),
+                                bulk_tujuan,
                             )
                             count += 1
+                    st.session_state["last_verifikator"] = bulk_verifikator.strip()
                     st.success(
                         f"✅ Berhasil mengubah status **{count} SEP** "
                         f"menjadi **{bulk_new_status}**"
@@ -1762,11 +1863,13 @@ with tab_riwayat:
         st.divider()
 
         # Tabel riwayat
-        df_hist = pd.DataFrame(reversed(history))
-        df_hist.columns = ["SEP", "Status Lama", "Status Baru", "Catatan", "Verifikator", "Waktu"]
+        df_hist = pd.DataFrame(reversed(history)).reindex(
+            columns=["sep", "status_lama", "status_baru", "tujuan", "catatan", "verifikator", "waktu"]
+        ).fillna("")
+        df_hist.columns = ["SEP", "Status Lama", "Status Baru", "Tujuan", "Catatan", "Verifikator", "Waktu"]
 
         # Filter riwayat
-        col_f1, col_f2 = st.columns(2)
+        col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             hist_filter_sep = st.text_input(
                 "🔎 Filter SEP", placeholder="Ketik nomor SEP...", key="hist_filter_sep"
@@ -1774,6 +1877,10 @@ with tab_riwayat:
         with col_f2:
             hist_filter_verif = st.text_input(
                 "👨‍⚕️ Filter Verifikator", placeholder="Nama verifikator...", key="hist_filter_verif"
+            )
+        with col_f3:
+            hist_filter_tujuan = st.selectbox(
+                "🎯 Filter Tujuan", ["Semua"] + TUJUAN_OPTIONS[1:], key="hist_filter_tujuan"
             )
 
         df_hist_display = df_hist.copy()
@@ -1785,6 +1892,10 @@ with tab_riwayat:
             df_hist_display = df_hist_display[
                 df_hist_display["Verifikator"].astype(str).str.contains(hist_filter_verif.strip(), case=False, na=False)
             ]
+        if hist_filter_tujuan != "Semua":
+            df_hist_display = df_hist_display[
+                df_hist_display["Tujuan"].astype(str) == hist_filter_tujuan
+            ]
 
         st.dataframe(
             df_hist_display,
@@ -1795,7 +1906,8 @@ with tab_riwayat:
                 "SEP": st.column_config.TextColumn("SEP", width=180),
                 "Status Lama": st.column_config.TextColumn("Status Lama", width=140),
                 "Status Baru": st.column_config.TextColumn("Status Baru", width=140),
-                "Catatan": st.column_config.TextColumn("Catatan", width=300),
+                "Tujuan": st.column_config.TextColumn("Tujuan", width=130),
+                "Catatan": st.column_config.TextColumn("Catatan", width=280),
                 "Verifikator": st.column_config.TextColumn("Verifikator", width=120),
                 "Waktu": st.column_config.TextColumn("Waktu", width=140),
             },
@@ -1814,9 +1926,10 @@ with tab_riwayat:
             for _, entry in sep_entries.iterrows():
                 e_lama = STATUS_EMOJI_MAP.get(entry["Status Lama"], "")
                 e_baru = STATUS_EMOJI_MAP.get(entry["Status Baru"], "")
+                tujuan_e = entry["Tujuan"] if str(entry["Tujuan"]).strip() else "-"
                 st.write(
                     f"🕐 `{entry['Waktu']}` — {e_lama} **{entry['Status Lama']}** → "
-                    f"{e_baru} **{entry['Status Baru']}** oleh **{entry['Verifikator']}**"
+                    f"{e_baru} **{entry['Status Baru']}** oleh **{entry['Verifikator']}** (Tujuan: **{tujuan_e}**)"
                 )
                 st.write(f"   📝 _{entry['Catatan']}_")
 
